@@ -1,0 +1,78 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import csv
+import json
+import logging
+
+if __name__ == "__main__":
+
+    import optparse
+    opt_parser = optparse.OptionParser()
+
+    opt_parser.add_option('-O', '--outfile', dest='outfile', action='store', default=None, help="... (Default is STDOUT)")
+
+    opt_parser.add_option('-s', '--strict', dest='strict', action='store_true', default=False, help='... (Default is False)')
+    opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
+    opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is False)')
+
+    options, args = opt_parser.parse_args()
+
+    if options.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    #
+
+    if options.outfile:
+        out = open(options.outfile, "w")
+    else:
+        out = sys.stdout
+
+    #
+
+    for path in args:
+
+        fh = open(path, "r")
+        
+        reader = csv.DictReader(fh)
+        
+        for row in reader:
+
+            # LON,LAT,NUMBER,STREET,UNIT,CITY,DISTRICT,REGION,POSTCODE,ID,HASH
+
+            lat = row["LAT"]
+            lon = row["LON"]
+
+            id = row["ID"]
+            hash = row["HASH"]
+
+            name = ""
+            house_number = row["NUMBER"]
+            street = row["STREET"]
+
+            #
+
+            coords = [ lon, lat ]
+            geom = { "type": "Point", "coordinates": coords }
+
+            props = {
+                "name": name,
+                "house_number": house_number,
+                "street": street,
+            }
+            
+            feature = {
+                "type": "Feature",
+                "geometry": geom,
+                "properties": props,
+                "oa:id": id,
+                "oa:hash": hash
+            }
+            
+            out.write(json.dumps(feature))
+            out.write("\n")
+
+        sys.exit(0)

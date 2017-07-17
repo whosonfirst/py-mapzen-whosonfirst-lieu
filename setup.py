@@ -27,6 +27,7 @@ setup(
     packages=packages,
     scripts=[
         'scripts/socrata2lieu',
+        'scripts/openaddresses2lieu',
         ],
     download_url='https://github.com/whosonfirst/py-mapzen-whosonfirst-lieu/releases/tag/' + version,
     license='BSD')
