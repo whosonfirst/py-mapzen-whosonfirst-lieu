@@ -62,14 +62,15 @@ if __name__ == "__main__":
                 "name": name,
                 "house_number": house_number,
                 "street": street,
+                "addr:full": "",
+                "oa:hash": hash
             }
             
             feature = {
                 "type": "Feature",
                 "geometry": geom,
                 "properties": props,
-                "oa:id": id,
-                "oa:hash": hash
+                "id": id,
             }
             
             out.write(json.dumps(feature))

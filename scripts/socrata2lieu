@@ -154,6 +154,9 @@ if __name__ == "__main__":
 
             #
 
+            lat = float(lat)
+            lon = float(lon)
+
             coords = [ lon, lat ]
             geom = { "type": "Point", "coordinates": coords }
 
@@ -161,6 +164,7 @@ if __name__ == "__main__":
                 "name": name,
                 "house_number": house_number,
                 "street": street,
+                "addr:full": address,
             }
             
             feature = {
