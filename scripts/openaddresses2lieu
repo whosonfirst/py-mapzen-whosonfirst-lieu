@@ -58,6 +58,8 @@ if __name__ == "__main__":
             coords = [ lon, lat ]
             geom = { "type": "Point", "coordinates": coords }
 
+            source_id = "oa#%s" % id
+
             props = {
                 "name": name,
                 "addr:housenumber": house_number,
@@ -65,12 +67,12 @@ if __name__ == "__main__":
                 "addr:full": "",
                 "oa:hash": hash
             }
-            
+        
             feature = {
                 "type": "Feature",
                 "geometry": geom,
                 "properties": props,
-                "id": id,
+                "id": source_id,
             }
             
             out.write(json.dumps(feature))

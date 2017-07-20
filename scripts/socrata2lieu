@@ -17,6 +17,7 @@ if __name__ == "__main__":
 
     opt_parser.add_option('-F', '--filter', dest='filter', action='store', default="geo", help="... (Default is 'geo')")
     opt_parser.add_option('-O', '--outfile', dest='outfile', action='store', default=None, help="... (Default is STDOUT)")
+    opt_parser.add_option('-S', '--source', dest='source', action='store', default=None, help="... (Default is None)")
 
     opt_parser.add_option('-s', '--strict', dest='strict', action='store_true', default=False, help='... (Default is False)')
     opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
@@ -44,6 +45,12 @@ if __name__ == "__main__":
         if not options.api_key:
             logging.error("libpostal is not installed, so a valid Mapzen API key is required")
             sys.exit(1)
+
+    #
+
+    if options.source == None:
+        logging.error("You must pass in a --source (-S) parameter, for prefixing IDs with")
+        sys.exit(1)
 
     #
 
@@ -160,6 +167,8 @@ if __name__ == "__main__":
             coords = [ lon, lat ]
             geom = { "type": "Point", "coordinates": coords }
 
+            source_id = "%s#%s" % (options.source, id)
+
             props = {
                 "name": name,
                 "addr:housenumber": house_number,
@@ -171,7 +180,7 @@ if __name__ == "__main__":
                 "type": "Feature",
                 "geometry": geom,
                 "properties": props,
-                "id": id
+                "id": source_id
             }
             
             out.write(json.dumps(feature))
