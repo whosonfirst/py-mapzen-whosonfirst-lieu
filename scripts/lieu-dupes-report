@@ -3,11 +3,36 @@
 import os
 import sys
 import json
-import pprint
+import csv
+import logging
 
 if __name__ == "__main__":
 
-    for path in sys.argv[1:]:
+    import optparse
+    opt_parser = optparse.OptionParser()
+
+    opt_parser.add_option('-O', '--outfile', dest='outfile', action='store', default=None, help="... (Default is STDOUT)")
+
+    opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
+    opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is False)')
+
+    options, args = opt_parser.parse_args()
+
+    if options.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    #
+
+    if options.outfile:
+        out = open(options.outfile, "w")
+    else:
+        out = sys.stdout
+
+    writer = csv.writer(out, delimiter="\t")
+
+    for path in args:
 
         fh = open(path, "r")
 
@@ -20,11 +45,16 @@ if __name__ == "__main__":
             fid = feature["id"]
             same = []
             
-            for sa in data["same_as"]:
+            for sa in data.get("same_as", []):
                 
                 sa_feature = sa["object"]
                 sa_fid = sa_feature["id"]
                 
                 same.append(sa_fid)
 
-            print "%s\t%s" % (fid, ",".join(map(str, same)))
+            out = [
+                fid,
+                ",".join(map(str, same))
+            ]
+
+            writer.writerow(out)
