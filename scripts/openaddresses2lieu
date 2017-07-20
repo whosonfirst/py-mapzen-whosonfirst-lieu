@@ -60,8 +60,8 @@ if __name__ == "__main__":
 
             props = {
                 "name": name,
-                "house_number": house_number,
-                "street": street,
+                "addr:housenumber": house_number,
+                "addr:street": street,
                 "addr:full": "",
                 "oa:hash": hash
             }

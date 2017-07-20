@@ -1,0 +1,30 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import json
+import pprint
+
+if __name__ == "__main__":
+
+    for path in sys.argv[1:]:
+
+        fh = open(path, "r")
+
+        for ln in fh:
+
+            data = json.loads(ln)
+            # print pprint.pformat(data)
+
+            feature = data["object"]
+            fid = feature["id"]
+            same = []
+            
+            for sa in data["same_as"]:
+                
+                sa_feature = sa["object"]
+                sa_fid = sa_feature["id"]
+                
+                same.append(sa_fid)
+
+            print "%s\t%s" % (fid, ",".join(map(str, same)))

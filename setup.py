@@ -26,6 +26,8 @@ setup(
     url='https://github.com/whosonfirst/py-mapzen-whosonfirst-lieu',
     packages=packages,
     scripts=[
+        'scripts/lieu-dupes-filter',
+        'scripts/lieu-dupes-report',
         'scripts/socrata2lieu',
         'scripts/openaddresses2lieu',
         ],
