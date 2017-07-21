@@ -19,7 +19,7 @@ desc = open("README.md").read()
 
 setup(
     name='mapzen.whosonfirst.lieu',
-    namespace_packages=[],
+    namespace_packages=['mapzen', 'mapzen.whosonfirst'],
     version=version,
     description='Who\'s On First utilities for working with the lieu toolchain.',
     author='Mapzen',
@@ -27,6 +27,7 @@ setup(
     packages=packages,
     scripts=[
         'scripts/lieu-dupes-filter',
+        'scripts/lieu-dupes-process',
         'scripts/lieu-dupes-report',
         'scripts/socrata2lieu',
         'scripts/openaddresses2lieu',

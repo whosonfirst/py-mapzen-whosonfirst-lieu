@@ -1,0 +1,137 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import logging
+import json
+
+# import mapzen.whosonfirst.utils
+# import mapzen.whosonfirst.export
+import mapzen.whosonfirst.lieu
+
+if __name__ == "__main__":
+
+    import optparse
+    opt_parser = optparse.OptionParser()
+
+    opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
+    opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is False)')
+
+    options, args = opt_parser.parse_args()
+
+    if options.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    logging.warning("TOO SOON - THIS DOESN'T DO ANYTHING YET")
+
+    all_superseded = []
+
+    crawl = mapzen.whosonfirst.lieu.crawl(args)
+
+    for dupe, feature, same_as, err in crawl:
+        
+        if err != None:
+            logging.error(err)
+            continue
+
+        # for now... (20170721/thisisaaronland)
+
+        if dupe == False:
+            continue
+
+        src, id, err = mapzen.whosonfirst.lieu.parse_feature_id(feature)
+
+        if err != None:
+            logging.error(err)
+            continue
+
+        if src == "wof":
+
+            other = []
+            other_wof = []
+
+            principal_wof = None
+            superseded_wof = []
+
+            for other_feature in same_as:
+
+                other_src, ignore, err = mapzen.whosonfirst.lieu.parse_feature_id(feature)                
+            
+                if err != None:
+                    logging.error(err)
+                    continue
+
+                if other_src == "wof":
+                    other_wof.append(other_feature)
+
+            # first sort things according to lieu's ranking
+            # still waiting on confirmation from al b. about this
+
+            # TO DO: please make crawl() return vanilla features and
+            # not things with objects (20170721/thisisaaronland)
+
+            if len(other_wof) == 0:
+                principal_wof = feature
+
+            elif len(other_wof) == 1:
+                principal_wof = other_wof[0]["object"]
+                superseded_wof.append(feature)
+
+            else:
+                principal_wof = other_wof[0]["object"]
+                superseded_wof.append(feature)
+                
+                for f in other_wof[1:]:
+                    superseded_wof.append(f["object"])                    
+
+            # now we're just going to double check to make sure
+            # that any of the superseded records haven't been
+            # modified more recently than the principal or that
+            # the principal has already been superseded etc
+
+            # PLEASE FINISH WRITING ME (20170721/thisisaaronland)
+
+            principal_wofid = principal_wof["properties"]["wof:id"]
+            superseded_wofid = []
+
+            for f in superseded_wof:
+                
+                other_wofid = f["properties"]["wof:id"]
+                superseded_wofid.append(other_wofid)
+
+                logging.debug("%s is superseded by %s" % (other_wofid, principal_wofid))
+
+                if not other_wofid in all_superseded:
+                    all_superseded.append(other_wofid)
+
+            if principal_wofid in all_superseded:
+                logging.warning("wait... %s has been superseded already" % principal_wofid)
+
+            logging.debug("%s supersedes %s" % (principal_wofid, superseded_wofid))
+
+        else:
+
+            concordance_id = id
+
+            for other in same_as:
+
+                other_feature = other["object"]
+                other_src, ignore, err = mapzen.whosonfirst.lieu.parse_feature_id(other_feature)
+            
+                if err != None:
+                    logging.error(err)
+                    continue
+
+                if other_src != "wof":
+                    continue
+
+                wofid = other_feature["properties"]["wof:id"]
+
+                if wofid in all_superseded:
+                    logging.warning("%s has been superseded so skipping concordance (with %s#%s)" % (wofid, src, concordance_id))
+                    continue
+
+                logging.debug("%s has a concordance with %s %s" % (wofid, src, concordance_id))
+            
