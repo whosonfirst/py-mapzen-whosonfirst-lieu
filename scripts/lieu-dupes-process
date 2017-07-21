@@ -11,6 +11,8 @@ import mapzen.whosonfirst.lieu
 
 if __name__ == "__main__":
 
+    # /usr/local/bin/lieu-dupes-process ./deduped5/part-00*
+
     import optparse
     opt_parser = optparse.OptionParser()
 
