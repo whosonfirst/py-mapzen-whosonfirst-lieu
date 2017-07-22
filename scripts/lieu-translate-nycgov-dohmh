@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+# -*-python-*-
+
+import os
+import sys
+import csv
+import logging
+
+if __name__ == "__main__":
+
+    # experimental as in it is predicated on assigning the lat,lon of the container zip code
+    # waiting on word from al b. whether this is crazy talk (20170722/thisisaaronland)
+
+    logging.warning("EXPERIMENTAL. THIS DOESN'T REALLY DO ANYTHING YET...")
+
+    # first dedupe this:
+    # https://data.cityofnewyork.us/Health/DOHMH-New-York-City-Restaurant-Inspection-Results/xx67-kt59
+
+    # which is pretty much the same as this:
+    # https://data.cityofnewyork.us/Health/Restaurants-rolled-up-/59dk-tdhz
+
+    orig = sys.argv[1]
+    fh = open(orig, "r")
+
+    reader = csv.DictReader(fh)
+    writer = None
+
+    lookup = {}
+
+    for row in reader:
+
+        camis = row["CAMIS"]
+
+        if lookup.get(camis, None):
+            continue
+
+        if not writer:
+            writer = csv.DictWriter(sys.stdout, fieldnames=row.keys())
+            writer.writeheader()
+
+        keys = "CAMIS,DBA,BORO,BUILDING,STREET,ZIPCODE,PHONE,CUISINE DESCRIPTION"
+        keys = keys.split(",")
+
+        for k, v in row.items():
+
+            if not k in keys:
+                del(row[k])
+
+        writer.writerow(row)
+        lookup[camis] = True
+    
+    logging.error("please finish writing me")
+    sys.exit(1)
+	
+        
