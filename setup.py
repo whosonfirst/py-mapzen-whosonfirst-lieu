@@ -29,8 +29,9 @@ setup(
         'scripts/lieu-dupes-filter',
         'scripts/lieu-dupes-process',
         'scripts/lieu-dupes-report',
-        'scripts/socrata2lieu',
-        'scripts/openaddresses2lieu',
+        'scripts/lieu-translate-nycgov',
+        'scripts/lieu-translate-openaddresses',
+        'scripts/lieu-translate-socrata',
         ],
     download_url='https://github.com/whosonfirst/py-mapzen-whosonfirst-lieu/releases/tag/' + version,
     license='BSD')

@@ -65,6 +65,9 @@ if __name__ == "__main__":
                     logging.error(err)
                     continue
 
+                if not other_feature["canonical"]: 
+                    continue
+
                 if other_src == "wof":
                     other_wof.append(other_feature)
 

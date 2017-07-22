@@ -1,0 +1,193 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import csv
+import json
+import re
+import requests
+import logging
+
+if __name__ == "__main__":
+
+    import optparse
+    opt_parser = optparse.OptionParser()
+
+    opt_parser.add_option('-A', '--api-key', dest='api_key', action='store', default=None, help='... (Default is None)')
+
+    opt_parser.add_option('-F', '--filter', dest='filter', action='store', default="geo", help="... (Default is 'geo')")
+    opt_parser.add_option('-O', '--outfile', dest='outfile', action='store', default=None, help="... (Default is STDOUT)")
+
+    opt_parser.add_option('-s', '--strict', dest='strict', action='store_true', default=False, help='... (Default is False)')
+    opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
+    opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is False)')
+
+    options, args = opt_parser.parse_args()
+
+    if options.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    #
+
+    has_pypostal = False
+
+    try:
+        from postal.parser import parse_address
+        has_pypostal = True
+
+        logging.info("libpostal is installed, using local bindings for address parsing")
+
+    except Exception, e:
+
+        if not options.api_key:
+            logging.error("libpostal is not installed, so a valid Mapzen API key is required")
+            sys.exit(1)
+
+    #
+
+    if options.outfile:
+        out = open(options.outfile, "w")
+    else:
+        out = sys.stdout
+
+    #
+
+    source = "nycgov"
+
+    pat = re.compile(r'\((\-?\d+\.\d+),\s*(\-?\d+\.\d+)\)')
+
+    for path in args:
+
+        fh = open(path, "r")
+        
+        reader = csv.DictReader(fh)
+        
+        for row in reader:
+            
+            id = row["DCA License Number"]
+
+            name = row["Business Name"]
+
+            if row["Business Name 2"]:
+                name = row["Business Name 2"]
+
+            housenumber = row["Address Building"]
+            street = row["Address Street Name"]
+            city = row["Address City"]
+            region = row["Address State"]
+            postal = row["Address ZIP"]
+            postal = row["Address ZIP"]
+
+            lat = None
+            lon = None
+            
+            if row["Latitude"]:
+                lat = float(row["Latitude"])
+
+            if row["Longitude"]:
+                lon = float(row["Longitude"])
+                    
+            # https://github.com/openvenues/lieu#input-formats
+
+            if options.filter == "geo":
+
+                if lat == None or lon == None:
+                    continue
+
+            if options.filter == "no-geo":
+
+                if lat != None and lon != None:
+                    continue
+
+            #
+
+            addr_full = " ".join((housenumber, street, city, region, postal))
+
+            house_number = None
+            street = None
+            postal = None
+
+            try:
+
+                if has_pypostal:
+
+                    rsp = parse_address(addr_full)
+                    lookup = {}
+                    
+                    for pair in rsp:
+                        v, k = pair
+
+                        possible = lookup.get(k, [])
+                        possible.append(v)                        
+                        lookup[k] = possible
+                        
+                    house_number = lookup.get("house_number", None)
+                    street = lookup.get("road", None)
+
+                    if house_number:
+                        house_number = house_number[0]
+
+                    if street:
+                        street = street[0]
+                
+                else:
+                
+                    url = "https://libpostal.mapzen.com/parse"
+                    params = { "address" : addr_full, "format": "keys", "api_key": api_key }
+                    
+                    rsp = requests.get(url, params=params)
+                    rsp = json.loads(rsp.content)
+                    
+                    house_number = rsp["house_number"][0]
+                    street = rsp["road"][0]
+                    
+            except Exception, e:
+
+                    logging.error("failed to parse address (%s) because %s" % (address, e))
+
+                    if options.strict:
+                        sys.exit(1)
+
+                    continue
+
+            #
+
+            coords = [ lon, lat ]
+            geom = { "type": "Point", "coordinates": coords }
+
+            source_id = "%s#%s" % (source, id)
+
+            props = {
+                "name": name,
+                "addr:full": addr_full,
+                "addr:housenumber": house_number,
+                "addr:street": street,
+                "addr:full": addr_full,
+            }
+            
+            #
+
+            for k, v in row.items():
+
+                k = k.lower()
+                k = k.replace(" ", "_")
+                
+                fq_k = "%s:%s" % (source, k)
+
+                props[ fq_k ] = v
+
+            #
+
+            feature = {
+                "type": "Feature",
+                "geometry": geom,
+                "properties": props,
+                "id": source_id
+            }
+            
+            out.write(json.dumps(feature))
+            out.write("\n")
+
+        sys.exit(0)
