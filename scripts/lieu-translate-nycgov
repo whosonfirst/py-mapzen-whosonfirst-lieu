@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+# https://data.cityofnewyork.us/Business/Legally-Operating-Businesses/w7w3-xahh/data
+# /usr/local/bin/lieu-translate-nycgov Legally_Operating_Businesses.csv > nyc-lob.geojson.txt
+
 import os
 import sys
 import csv
