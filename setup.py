@@ -31,6 +31,7 @@ setup(
         'scripts/lieu-dupes-report',
         'scripts/lieu-translate-nycgov-lob',
         'scripts/lieu-translate-openaddresses',
+        'scripts/lieu-translate-sfgov-abl',
         'scripts/lieu-translate-socrata',
         ],
     download_url='https://github.com/whosonfirst/py-mapzen-whosonfirst-lieu/releases/tag/' + version,

@@ -1,0 +1,197 @@
+#!/usr/bin/env python
+
+# https://data.sfgov.org/Economy-and-Community/Active-Business-Locations/kvj8-g7jh <-- no geo
+# https://data.sfgov.org/Economy-and-Community/Map-of-Registered-Business-Locations/ednt-jx6u <-- geo, because...
+
+import os
+import sys
+import csv
+import json
+import requests
+import logging
+import re
+
+if __name__ == "__main__":
+
+    import optparse
+    opt_parser = optparse.OptionParser()
+
+    opt_parser.add_option('-A', '--api-key', dest='api_key', action='store', default=None, help='... (Default is None)')
+
+    opt_parser.add_option('-F', '--filter', dest='filter', action='store', default="geo", help="... (Default is 'geo')")
+    opt_parser.add_option('-O', '--outfile', dest='outfile', action='store', default=None, help="... (Default is STDOUT)")
+
+    opt_parser.add_option('-s', '--strict', dest='strict', action='store_true', default=False, help='... (Default is False)')
+    opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
+    opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is False)')
+
+    options, args = opt_parser.parse_args()
+
+    if options.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    #
+
+    has_pypostal = False
+
+    try:
+        from postal.parser import parse_address
+        has_pypostal = True
+
+        logging.info("libpostal is installed, using local bindings for address parsing")
+
+    except Exception, e:
+
+        if not options.api_key:
+            logging.error("libpostal is not installed, so a valid Mapzen API key is required")
+            sys.exit(1)
+
+    #
+
+    if options.outfile:
+        out = open(options.outfile, "w")
+    else:
+        out = sys.stdout
+
+    #
+
+    # 2998 SAN JOSE AV San Francisco, CA 94112 (37.711486, -122.45562)
+    pat = re.compile(r'([^\(]+)\s+\((\-?\d+\.\d+),\s*(\-?\d+\.\d+)\)')
+
+    source = "sfgov"
+
+    for path in args:
+
+        fh = open(path, "r")
+        
+        reader = csv.DictReader(fh)
+        
+        for row in reader:
+            
+            # Location Id,Business Account Number,Ownership Name,DBA Name,Street Address,City,State,Source Zipcode,Business Start Date,Business End Date,Location Start Date,Location End Date,Mail Address,Mail City,Mail Zipcode,Mail State,NAICS Code,NAICS Code Description,Parking Tax,Transient Occupancy Tax,LIC Code,LIC Code Description,Supervisor District,Neighborhoods - Analysis Boundaries,Business Corridor,Business Location
+
+            id = row["Location Id"]
+            name = row["DBA Name"]
+
+            addr_full = " ".join((row["Street Address"], row["City"], row["State"], row["Source Zipcode"]))
+
+            loc = row["Business Location"].replace("\n", " ")
+
+            lat = None
+            lon = None
+            
+            if loc != "":
+
+                m = pat.match(loc)
+
+                if m:
+                    gr = m.groups()
+                    addr_full = gr[0]
+                    lat = float(gr[1])
+                    lon = float(gr[2])
+
+                    # print "%s %s (%s, %s)" % (addr_full, gr[0], lat, lon)
+                    # sys.exit()
+
+            # https://github.com/openvenues/lieu#input-formats
+
+            if options.filter == "geo":
+
+                if lat == None or lon == None:
+                    continue
+
+            if options.filter == "no-geo":
+
+                if lat != None and lon != None:
+                    continue
+
+            #
+
+            house_number = None
+            street = None
+            postal = None
+
+            try:
+
+                if has_pypostal:
+
+                    rsp = parse_address(addr_full)
+                    lookup = {}
+                    
+                    for pair in rsp:
+                        v, k = pair
+
+                        possible = lookup.get(k, [])
+                        possible.append(v)                        
+                        lookup[k] = possible
+                        
+                    house_number = lookup.get("house_number", None)
+                    street = lookup.get("road", None)
+
+                    if house_number:
+                        house_number = house_number[0]
+
+                    if street:
+                        street = street[0]
+                
+                else:
+                
+                    url = "https://libpostal.mapzen.com/parse"
+                    params = { "address" : addr_full, "format": "keys", "api_key": api_key }
+                    
+                    rsp = requests.get(url, params=params)
+                    rsp = json.loads(rsp.content)
+                    
+                    house_number = rsp["house_number"][0]
+                    street = rsp["road"][0]
+                    
+            except Exception, e:
+
+                    logging.error("failed to parse address (%s) because %s" % (address, e))
+
+                    if options.strict:
+                        sys.exit(1)
+
+                    continue
+
+            #
+
+            coords = [ lon, lat ]
+            geom = { "type": "Point", "coordinates": coords }
+
+            source_id = "%s#%s" % (source, id)
+
+            props = {
+                "name": name,
+                "addr:full": addr_full,
+                "addr:housenumber": house_number,
+                "addr:street": street,
+                "addr:full": addr_full,
+            }
+            
+            #
+
+            for k, v in row.items():
+
+                k = k.lower()
+                k = k.replace(" ", "_")
+                
+                fq_k = "%s:%s" % (source, k)
+
+                props[ fq_k ] = v
+
+            #
+
+            feature = {
+                "type": "Feature",
+                "geometry": geom,
+                "properties": props,
+                "id": source_id
+            }
+            
+            out.write(json.dumps(feature))
+            out.write("\n")
+
+        sys.exit(0)

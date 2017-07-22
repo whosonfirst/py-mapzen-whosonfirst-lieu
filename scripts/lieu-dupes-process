@@ -65,7 +65,7 @@ if __name__ == "__main__":
                     logging.error(err)
                     continue
 
-                if not other_feature["canonical"]: 
+                if not other_feature.get("is_canonical", False): 
                     continue
 
                 if other_src == "wof":
