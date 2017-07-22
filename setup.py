@@ -29,7 +29,7 @@ setup(
         'scripts/lieu-dupes-filter',
         'scripts/lieu-dupes-process',
         'scripts/lieu-dupes-report',
-        'scripts/lieu-translate-nycgov',
+        'scripts/lieu-translate-nycgov-lob',
         'scripts/lieu-translate-openaddresses',
         'scripts/lieu-translate-socrata',
         ],
