@@ -5,9 +5,140 @@ import sys
 import logging
 import json
 
-# import mapzen.whosonfirst.utils
-# import mapzen.whosonfirst.export
+import datetime
+
+import mapzen.whosonfirst.utils
+import mapzen.whosonfirst.export
+import mapzen.whosonfirst.sources
+
 import mapzen.whosonfirst.lieu
+
+# please move this in to import mapzen.whosonfirst.utils (probably?)
+
+def add_concordance(f, src, id, **kwargs):
+
+    data_root = kwargs.get("data_root", "/usr/local/data")
+
+    # this should probably be invoked sooner before even call this
+
+    props = f["properties"]
+    wofid = props["wof:id"]
+    repo = props["wof:repo"]
+        
+    root = os.path.join(data_root, repo)
+    data = os.path.join(root, "data")
+
+    f = mapzen.whosonfirst.utils.load(data, wofid)
+    props = f["properties"]
+
+    concordances = props.get("wof:concordances", {})
+
+    if concordances.get(src):
+        logging.warning("%s already has a concordance with %s (%s)" % (wofid, src, concordances[src]))
+        return
+
+    concordances[src] = id
+    props["wof:concordances"] = concordances
+
+    if kwargs.has_key("is_current") and props.get("mz:is_current", -1) == -1:
+        props["mz:is_current"] = kwargs["is_current"]
+        
+    f["properties"] = props
+
+    exporter = mapzen.whosonfirst.export.flatfile(data)
+
+    if options.debug:
+        logging.info("debugging is enabled otherwise we would export %s here" % wofid)
+        return
+
+    logging.info("export %s" % exporter.export_feature(f))
+    
+def supersede_features(principal, others, **kwargs):
+
+    data_root = kwargs.get("data_root", "/usr/local/data")
+
+    # this should probably be invoked sooner before even call this
+
+    p_props = principal["properties"]
+    p_wofid = p_props["wof:id"]
+    p_repo = p_props["wof:repo"]
+        
+    p_root = os.path.join(data_root, p_repo)
+    p_data = os.path.join(p_root, "data")
+
+    principal = mapzen.whosonfirst.utils.load(p_data, p_wofid)
+    tmp = []
+    
+    for o in others:
+
+        o_props = o["properties"]
+        o_wofid = o_props["wof:id"]
+        o_repo = o_props["wof:repo"]
+
+        root = os.path.join(data_root, o_repo)
+        data = os.path.join(root, "data")
+
+        o = mapzen.whosonfirst.utils.load(data, o_wofid)
+        tmp.append(o)
+
+    others = tmp
+
+    # first update the things being superseded
+
+    for o in others:
+
+        o_props = o["properties"]
+        o_props["mz:is_current"] = 0
+        
+        sb = o_props.get("wof:superseded_by", [])
+
+        if not p_wofid in sb:
+            sb.append(p_wofid)
+
+        o_props["wof:superseded_by"] = sb
+
+        if kwargs.get("deprecate_superseded", False):
+
+            today = datetime.date.today()
+            ymd = today.isoformat()
+            o_props["edtf:deprecated"] = ymd
+
+        o["properties"] = o_props
+
+        o_repo = o_props["wof:repo"]
+        o_root = os.path.join(data_root, o_repo)
+        o_data = os.path.join(o_root, "data")
+
+        exporter = mapzen.whosonfirst.export.flatfile(o_data)
+
+        if options.debug:
+            logging.info("debugging is enabled otherwise we would export %s here" % o_wofid)
+            continue
+
+        logging.info("export %s" % exporter.export_feature(o))
+
+    # now update the principal
+
+    s = p_props.get("wof:supersedes", [])
+
+    for o in others:
+
+        o_props = o["properties"]
+        o_wofid = o_props["wof:id"]
+
+        if not o_wofid in s:
+            s.append(o_wofid)
+
+    p_props["wof:supersedes"] = s
+    principal["properties"] = p_props
+
+    exporter = mapzen.whosonfirst.export.flatfile(p_data)
+
+    if options.debug:
+        logging.info("debugging is enabled otherwise we would export %s here" % p_wofid)
+        return
+
+    logging.info("export %s" % exporter.export_feature(principal))
 
 if __name__ == "__main__":
 
@@ -15,6 +146,9 @@ if __name__ == "__main__":
 
     import optparse
     opt_parser = optparse.OptionParser()
+
+    opt_parser.add_option('-D', '--data-root', dest='data_root', action='store', default="/usr/local/data", help='... (Default is /usr/local/data')
+    opt_parser.add_option('-S', '--strict', dest='strict', action='store_true', default=False, help='... (Default is False)')
 
     opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
     opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is False)')
@@ -26,9 +160,18 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.INFO)
 
-    logging.warning("TOO SOON - THIS DOESN'T DO ANYTHING YET")
-
     all_superseded = []
+
+    supersedes = 0
+    concordances = 0
+
+    skipped_supersedes = 0
+    skipped_concordances = 0
+
+    other_to_wof = {}
+    other_to_other = {}
+
+    ts = mapzen.whosonfirst.lieu.to_string	# this is just here to save typing (20170723/thisisaaronland)
 
     crawl = mapzen.whosonfirst.lieu.crawl(args)
 
@@ -49,6 +192,12 @@ if __name__ == "__main__":
             logging.error(err)
             continue
 
+        if options.strict:
+
+            if not mapzen.whosonfirst.sources.is_valid_source(src):
+                logging.error("%s is an invalid or unknown source" % src)
+                sys.exit(1)
+
         if src == "wof":
 
             other = []
@@ -66,6 +215,7 @@ if __name__ == "__main__":
                     continue
 
                 if not other_feature.get("is_canonical", False): 
+                    skipped_supersedes += 1
                     continue
 
                 if other_src == "wof":
@@ -106,15 +256,26 @@ if __name__ == "__main__":
                 other_wofid = f["properties"]["wof:id"]
                 superseded_wofid.append(other_wofid)
 
-                logging.debug("%s is superseded by %s" % (other_wofid, principal_wofid))
+                logging.debug("SUPERSEDED BY:\n%s is superseded by\n%s" % (ts(f), ts(principal_wof)))
 
                 if not other_wofid in all_superseded:
                     all_superseded.append(other_wofid)
 
             if principal_wofid in all_superseded:
-                logging.warning("wait... %s has been superseded already" % principal_wofid)
+                logging.warning("WAIT... %s has been superseded already" % principal_wofid)
+                continue
 
-            logging.debug("%s supersedes %s" % (principal_wofid, superseded_wofid))
+            for o in superseded_wof:
+                logging.debug("SUPERSEDES:\n%s supersedes\n%s" % (ts(principal_wof), ts(o)))
+                
+            kwargs = {
+                "data_root": options.data_root,
+                "debug": options.debug,
+                "deprecate_superseded": True	# CLI switch?
+            }
+
+            supersede_features(principal_wof, superseded_wof, **kwargs)
+            supersedes += 1
 
         else:
 
@@ -123,20 +284,54 @@ if __name__ == "__main__":
             for other in same_as:
 
                 other_feature = other["object"]
-                other_src, ignore, err = mapzen.whosonfirst.lieu.parse_feature_id(other_feature)
+                other_src, other_id, err = mapzen.whosonfirst.lieu.parse_feature_id(other_feature)
             
                 if err != None:
                     logging.error(err)
                     continue
 
-                if other_src != "wof":
-                    continue
+                if other_src == "wof":
 
-                wofid = other_feature["properties"]["wof:id"]
+                    wofid = other_feature["properties"]["wof:id"]
 
-                if wofid in all_superseded:
-                    logging.warning("%s has been superseded so skipping concordance (with %s#%s)" % (wofid, src, concordance_id))
-                    continue
+                    if wofid in all_superseded:
+                        logging.warning("%s has been superseded so skipping concordance (with %s#%s)" % (wofid, src, concordance_id))
 
-                logging.debug("%s has a concordance with %s %s" % (wofid, src, concordance_id))
-            
+                        skipped_concordances += 1
+                        continue
+
+                    other_to_wof[ wofid ] = concordance_id
+
+                    concordance_key = "%s:id" % src
+
+                    kwargs = {
+                        "data_root": options.data_root,
+                        "debug": options.debug,
+                        "is_current": 1
+                    }
+
+                    add_concordance(other_feature, concordance_key, concordance_id, **kwargs)
+
+                    logging.debug("CONCORDANCE:\n%s is the same as\n%s" % (ts(other_feature), ts(feature)))
+                    concordances += 1
+
+                else:
+
+                    o = other_to_other.get(concordance_id, [])
+                    if not other_id in o:
+                        o.append(other_id)
+
+                    other_to_other[concordance_id] = o
+
+    for k, v in other_to_other.items():
+
+        if not other_to_wof.get(k):
+            continue
+
+        wofid = other_to_wof[k]
+        others = other_to_other[k]
+
+        logging.info("WOF ID %s also has a concordance with %s" % (wofid, others))
+
+    logging.info("supersedes: %s (%s skipped)" % (supersedes, skipped_supersedes))
+    logging.info("concordances: %s (%s skipped)" % (concordances, skipped_concordances))

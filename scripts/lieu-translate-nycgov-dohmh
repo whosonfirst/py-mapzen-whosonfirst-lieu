@@ -8,8 +8,18 @@ import logging
 
 if __name__ == "__main__":
 
-    # experimental as in it is predicated on assigning the lat,lon of the container zip code
-    # waiting on word from al b. whether this is crazy talk (20170722/thisisaaronland)
+    """
+    from al b. (20170723)
+
+    ZIP code centroids should be fine.
+
+    As mentioned, lat/lons in lieu are mainly used for blocking or grouping things
+    that might be dupes together for pairwise comparison. For venues we use a geohash
+    prefix of 6, which equates to about 1.2km x 0.6km, plus its 8 neighbors to avoid
+    the fault line issue, so 9 tiles total covering a grid that's roughly 3.6km x 1.8km.
+    If the real venue is within that distance of the postal code centroid, they'll still
+    match.
+    """
 
     logging.warning("EXPERIMENTAL. THIS DOESN'T REALLY DO ANYTHING YET...")
 
@@ -33,6 +43,10 @@ if __name__ == "__main__":
 
         if lookup.get(camis, None):
             continue
+
+        postalcode = row["ZIPCODE"]
+
+        # PLEASE GET POSTALCODE HERE...
 
         if not writer:
             writer = csv.DictWriter(sys.stdout, fieldnames=row.keys())
