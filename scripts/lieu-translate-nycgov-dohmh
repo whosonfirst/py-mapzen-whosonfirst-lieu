@@ -6,6 +6,8 @@ import sys
 import csv
 import logging
 
+import mapzen.whosonfirst.utils
+
 if __name__ == "__main__":
 
     """
@@ -19,7 +21,37 @@ if __name__ == "__main__":
     the fault line issue, so 9 tiles total covering a grid that's roughly 3.6km x 1.8km.
     If the real venue is within that distance of the postal code centroid, they'll still
     match.
+
+    For example:
+    lieu-translate-nycgov-dohmh DOHMH_New_York_City_Restaurant_Inspection_Results.csv > dohmh-postalcodes.csv
+
+    grep 'DEAN ST' ./dohmh-postalcodes.csv | grep BROOKLYN
+    190,,40.682417,RUCOLA,,Italian,11217,,,BROOKLYN,7185763209,,DEAN STREET,41583046,,,,,-73.979385,
+    755,,40.67917,DEAN STREET,,American,11238,,,BROOKLYN,7187833326,,DEAN STREET,41549861,,,,,-73.963801,
+    446,,40.682417,KULUSHKAT GOURMET FALAFEL,,Mediterranean,11217,,,BROOKLYN,3477991972,,DEAN STREET,41588805,,,,,-73.979385,
+    446,,40.682417,BROCCOLINO,,Italian,11217,,,BROOKLYN,7186784200,,DEAN STREET,41719935,,,,,-73.979385,
+    85,,40.694684,BLUE BOTTLE COFFEE,,CafÃ©/Coffee/Tea,11201,,,BROOKLYN,5106533394,,DEAN ST,50050336,,,,,-73.989664,
+    450,,40.682417,PATSY'S PIZZERIA,,Italian,11217,,,BROOKLYN,7186222268,,DEAN ST,50038753,,,,,-73.979385,
+    446,,40.682417,PIZZA SUPERSTAR,,Pizza,11217,,,BROOKLYN,3477630440,,DEAN ST,50007613,,,,,-73.979385,
+    634,,40.67917,FOUR & TWENTY BLACKBIRDS,,CafÃ©/Coffee/Tea,11238,,,BROOKLYN,3473505110,,DEAN ST,50060455,,,,,-73.963801,
+    772,,40.67917,ODE TO BABEL,,American,11238,,,BROOKLYN,9175350500,,DEAN ST,50038892,,,,,-73.963801,    
     """
+
+    import optparse
+    opt_parser = optparse.OptionParser()
+
+    opt_parser.add_option('-D', '--data-root', dest='data_root', action='store', default="/usr/local/data", help='... (Default is /usr/local/data')
+    # add hooks for --api-key here...
+
+    opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
+    opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is False)')
+
+    options, args = opt_parser.parse_args()
+
+    if options.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
 
     logging.warning("EXPERIMENTAL. THIS DOESN'T REALLY DO ANYTHING YET...")
 
@@ -35,7 +67,26 @@ if __name__ == "__main__":
     reader = csv.DictReader(fh)
     writer = None
 
+    postalcodes = {}
     lookup = {}
+
+    # Please add hooks to use the API or something...
+
+    root = os.path.join(options.data_root, "whosonfirst-data-postalcode-us")
+    data = os.path.join(root, "data")
+
+    crawl = mapzen.whosonfirst.utils.crawl(data, inflate=True)
+
+    for feature in crawl:
+
+        props = feature["properties"]
+
+        name = props["wof:name"]
+        lat = props["geom:latitude"]
+        lon = props["geom:longitude"]
+        postalcodes[name] = [lat, lon]
+
+    #
 
     for row in reader:
 
@@ -44,15 +95,23 @@ if __name__ == "__main__":
         if lookup.get(camis, None):
             continue
 
-        postalcode = row["ZIPCODE"]
+        zipcode = row["ZIPCODE"]
+        coords = postalcodes.get(zipcode, None)
 
-        # PLEASE GET POSTALCODE HERE...
+        if not coords:
+            logging.warning("can't find coords for %s and failed, skipping %s" % (zipcode, camis))
+            continue
+
+        lat, lon = coords
+
+        row["LATITUDE"] = lat
+        row["LONGITUDE"] = lon
 
         if not writer:
             writer = csv.DictWriter(sys.stdout, fieldnames=row.keys())
             writer.writeheader()
 
-        keys = "CAMIS,DBA,BORO,BUILDING,STREET,ZIPCODE,PHONE,CUISINE DESCRIPTION"
+        keys = "CAMIS,DBA,BORO,BUILDING,STREET,ZIPCODE,PHONE,CUISINE DESCRIPTION,LATITUDE,LONGITUDE"
         keys = keys.split(",")
 
         for k, v in row.items():
@@ -64,6 +123,4 @@ if __name__ == "__main__":
         lookup[camis] = True
     
     logging.error("please finish writing me")
-    sys.exit(1)
-	
-        
+    sys.exit(1)	
