@@ -5,6 +5,7 @@ import os
 import sys
 import csv
 import logging
+import json
 
 import mapzen.whosonfirst.utils
 
@@ -23,25 +24,16 @@ if __name__ == "__main__":
     match.
 
     For example:
-    lieu-translate-nycgov-dohmh DOHMH_New_York_City_Restaurant_Inspection_Results.csv > dohmh-postalcodes.csv
+    lieu-translate-nycgov-dohmh DOHMH_New_York_City_Restaurant_Inspection_Results.csv > dohmh-venues.geojson.txt
 
-    grep 'DEAN ST' ./dohmh-postalcodes.csv | grep BROOKLYN
-    190,,40.682417,RUCOLA,,Italian,11217,,,BROOKLYN,7185763209,,DEAN STREET,41583046,,,,,-73.979385,
-    755,,40.67917,DEAN STREET,,American,11238,,,BROOKLYN,7187833326,,DEAN STREET,41549861,,,,,-73.963801,
-    446,,40.682417,KULUSHKAT GOURMET FALAFEL,,Mediterranean,11217,,,BROOKLYN,3477991972,,DEAN STREET,41588805,,,,,-73.979385,
-    446,,40.682417,BROCCOLINO,,Italian,11217,,,BROOKLYN,7186784200,,DEAN STREET,41719935,,,,,-73.979385,
-    85,,40.694684,BLUE BOTTLE COFFEE,,CafÃ©/Coffee/Tea,11201,,,BROOKLYN,5106533394,,DEAN ST,50050336,,,,,-73.989664,
-    450,,40.682417,PATSY'S PIZZERIA,,Italian,11217,,,BROOKLYN,7186222268,,DEAN ST,50038753,,,,,-73.979385,
-    446,,40.682417,PIZZA SUPERSTAR,,Pizza,11217,,,BROOKLYN,3477630440,,DEAN ST,50007613,,,,,-73.979385,
-    634,,40.67917,FOUR & TWENTY BLACKBIRDS,,CafÃ©/Coffee/Tea,11238,,,BROOKLYN,3473505110,,DEAN ST,50060455,,,,,-73.963801,
-    772,,40.67917,ODE TO BABEL,,American,11238,,,BROOKLYN,9175350500,,DEAN ST,50038892,,,,,-73.963801,    
     """
 
     import optparse
     opt_parser = optparse.OptionParser()
 
     opt_parser.add_option('-D', '--data-root', dest='data_root', action='store', default="/usr/local/data", help='... (Default is /usr/local/data')
-    # add hooks for --api-key here...
+    opt_parser.add_option('-A', '--api-key', dest='api_key', action='store', default=None, help='... (Default is None)')
+    opt_parser.add_option('-O', '--outfile', dest='outfile', action='store', default=None, help="... (Default is STDOUT)")
 
     opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
     opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is False)')
@@ -61,7 +53,12 @@ if __name__ == "__main__":
     # which is pretty much the same as this:
     # https://data.cityofnewyork.us/Health/Restaurants-rolled-up-/59dk-tdhz
 
-    orig = sys.argv[1]
+    if options.outfile:
+        out = open(options.outfile, "w")
+    else:
+        out = sys.stdout
+
+    orig = args[0]
     fh = open(orig, "r")
 
     reader = csv.DictReader(fh)
@@ -107,9 +104,11 @@ if __name__ == "__main__":
         row["LATITUDE"] = lat
         row["LONGITUDE"] = lon
 
+        """
         if not writer:
             writer = csv.DictWriter(sys.stdout, fieldnames=row.keys())
             writer.writeheader()
+        """
 
         keys = "CAMIS,DBA,BORO,BUILDING,STREET,ZIPCODE,PHONE,CUISINE DESCRIPTION,LATITUDE,LONGITUDE"
         keys = keys.split(",")
@@ -119,8 +118,50 @@ if __name__ == "__main__":
             if not k in keys:
                 del(row[k])
 
+        """
         writer.writerow(row)
+        """
+
+        id = row["CAMIS"]
+        name = row["DBA"]
+        
+        housenumber = row["BUILDING"]
+        street = row["STREET"]
+        city = row["BORO"]
+        region = "NY"
+        postal = zipcode
+        
+        lat = row["LATITUDE"]
+        lon = row["LONGITUDE"]
+
+        addr_full = " ".join((housenumber, street, city, region, postal))
+
+        source = "nyc_doh"
+        source_id = "%s:%s" % (source, id)
+
+        geom = { "type": "Point", "coordinates": [ lon, lat ] }
+
+        props = {
+            "addr:housenumber": housenumber,
+            "addr:street": street,
+            "addr:full": addr_full,
+            "mz:is_approximate": 1
+        }
+
+        for k, v in row.items():
+
+            k = k.lower()
+            fq_k = "%s:%s" % (source, k)
+            props[fq_k] = v
+
+        feature = {
+            "id": source_id,
+            "geometry": geom,
+            "properties": props,
+        }
+
+        out.write(json.dumps(feature))
+        out.write("\n")
+        
         lookup[camis] = True
     
-    logging.error("please finish writing me")
-    sys.exit(1)	
