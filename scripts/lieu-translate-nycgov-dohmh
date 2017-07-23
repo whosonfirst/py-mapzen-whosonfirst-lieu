@@ -11,6 +11,12 @@ import mapzen.whosonfirst.utils
 
 if __name__ == "__main__":
 
+    # as in:
+    # https://data.cityofnewyork.us/Health/DOHMH-New-York-City-Restaurant-Inspection-Results/xx67-kt59
+
+    # which is pretty much the same as this:
+    # https://data.cityofnewyork.us/Health/Restaurants-rolled-up-/59dk-tdhz
+
     """
     from al b. (20170723)
 
@@ -47,12 +53,6 @@ if __name__ == "__main__":
 
     logging.warning("EXPERIMENTAL. THIS DOESN'T REALLY DO ANYTHING YET...")
 
-    # first dedupe this:
-    # https://data.cityofnewyork.us/Health/DOHMH-New-York-City-Restaurant-Inspection-Results/xx67-kt59
-
-    # which is pretty much the same as this:
-    # https://data.cityofnewyork.us/Health/Restaurants-rolled-up-/59dk-tdhz
-
     if options.outfile:
         out = open(options.outfile, "w")
     else:
@@ -67,7 +67,8 @@ if __name__ == "__main__":
     postalcodes = {}
     lookup = {}
 
-    # Please add hooks to use the API or something...
+    # Please add hooks to use the API or something - we don't actually need to load 
+    # the postal codes for all of the US...
 
     root = os.path.join(options.data_root, "whosonfirst-data-postalcode-us")
     data = os.path.join(root, "data")
