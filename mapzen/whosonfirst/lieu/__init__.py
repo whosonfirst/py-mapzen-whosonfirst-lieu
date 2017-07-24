@@ -30,7 +30,7 @@ def to_string(f):
     name = props.get("name", "MISSING name")
 
     if not name:
-        name = props.get("wof:name")
+        name = props.get("wof:name", "MISSING name")
 
     housenumber = props.get("addr:housenumber", "MISSING addr:housenumber")
     street = props.get("addr:street", "MISSING addr:street")
