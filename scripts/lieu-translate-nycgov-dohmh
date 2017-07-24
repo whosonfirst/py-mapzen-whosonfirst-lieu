@@ -153,6 +153,7 @@ if __name__ == "__main__":
             props[fq_k] = v
 
         feature = {
+            "type": "Feature",
             "id": source_id,
             "geometry": geom,
             "properties": props,
