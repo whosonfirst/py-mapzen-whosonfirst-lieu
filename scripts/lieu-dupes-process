@@ -181,15 +181,11 @@ if __name__ == "__main__":
             logging.error(err)
             continue
 
-        # for now... (20170721/thisisaaronland)
-
-        if dupe == False:
-            continue
-
         source_prefix, source_key, id, err = mapzen.whosonfirst.lieu.parse_feature_id(feature)
 
         if err != None:
             logging.error(err)
+            logging.debug(feature)
             continue
 
         if options.strict:
@@ -198,7 +194,18 @@ if __name__ == "__main__":
                 logging.error("%s is an invalid or unknown source" % source_prefix)
                 sys.exit(1)
 
-        if src == "wof":
+        # for now... (20170721/thisisaaronland)
+
+        if dupe == False:
+
+            if source_prefix != "wof": 
+                logging.debug("SKIPPING because no dupes\n%s" % ts(feature))
+
+            continue
+        
+        # logging.debug("processing for %s:%s=%s" % (source_prefix, source_key, id))
+
+        if source_prefix == "wof":
 
             other = []
             other_wof = []
@@ -212,6 +219,7 @@ if __name__ == "__main__":
             
                 if err != None:
                     logging.error(err)
+                    logging.debug(other_feature)
                     continue
 
                 if not other_feature.get("is_canonical", False): 
@@ -303,7 +311,7 @@ if __name__ == "__main__":
 
                     other_to_wof[ wofid ] = concordance_id
 
-                    concordance_key = "%s:%s" % (other_source_preifx, other_source_key)
+                    concordance_key = "%s:%s" % (other_source_prefix, other_source_key)
 
                     kwargs = {
                         "data_root": options.data_root,

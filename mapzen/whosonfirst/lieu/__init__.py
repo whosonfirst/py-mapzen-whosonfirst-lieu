@@ -6,7 +6,7 @@ def parse_feature_id(f):
     fid = f.get("id", None)
 
     if not fid:
-        return None, None, Exception("Missing id property")
+        return None, None, None, Exception("Missing id property")
 
     mt = machinetag.common.from_string(fid)
 
@@ -17,7 +17,7 @@ def parse_feature_id(f):
 
 def to_string(f):
 
-    src, id, err = parse_feature_id(f)
+    prefix, key, id, err = parse_feature_id(f)
 
     if err != None:
         logging.warning(err)
@@ -27,18 +27,18 @@ def to_string(f):
     geom = f["geometry"]
     coords = geom["coordinates"]
 
-    name = props.get("name", None)
+    name = props.get("name", "MISSING name")
 
     if not name:
         name = props.get("wof:name")
 
-    housenumber = props["addr:housenumber"]
-    street = props["addr:street"]
+    housenumber = props.get("addr:housenumber", "MISSING addr:housenumber")
+    street = props.get("addr:street", "MISSING addr:street")
 
-    addr_full = props.get("addr:full", None)
+    addr_full = props.get("addr:full", "MISSING addr:full")
 
     label = [
-        "[%s] %s" % (src, id),
+        "[%s:%s=%s]" % (prefix, key, id),
         name,
         "%s %s" % (housenumber, street),
         "%s" % ",".join(map(str, coords)),

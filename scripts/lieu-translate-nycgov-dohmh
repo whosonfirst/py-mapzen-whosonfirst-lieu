@@ -12,6 +12,8 @@ import mapzen.whosonfirst.sources
 
 if __name__ == "__main__":
 
+    # lieu-translate-nycgov-dohmh -P nyc-postcodes.csv -O nycgov-dohmh-venues.geojson.txt DOHMH_New_York_City_Restaurant_Inspection_Results.csv
+
     # as in:
     # https://data.cityofnewyork.us/Health/DOHMH-New-York-City-Restaurant-Inspection-Results/xx67-kt59
 
@@ -38,8 +40,7 @@ if __name__ == "__main__":
     import optparse
     opt_parser = optparse.OptionParser()
 
-    opt_parser.add_option('-D', '--data-root', dest='data_root', action='store', default="/usr/local/data", help='... (Default is /usr/local/data')
-    opt_parser.add_option('-A', '--api-key', dest='api_key', action='store', default=None, help='... (Default is None)')
+    opt_parser.add_option('-P', '--postcodes', dest='postcodes', action='store', default=None, help='... (Default is None')
     opt_parser.add_option('-O', '--outfile', dest='outfile', action='store', default=None, help="... (Default is STDOUT)")
 
     opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
@@ -52,7 +53,29 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.INFO)
 
-    logging.warning("EXPERIMENTAL. THIS DOESN'T REALLY DO ANYTHING YET...")
+    # as in: lieu-fetch-postalcodes -A mapzen-****  85977539 > nyc-postcodes.csv
+
+    if not options.postcodes:
+        logging.error("Missing postcodes")
+        sys.exit(1)
+
+    if not os.path.exists(options.postcodes):
+        logging.error("Postcodes don't exist")
+        sys.exit(1)
+
+    postalcodes = {}
+    lookup = {}
+
+    pc = open(options.postcodes, "r")
+    reader = csv.reader(pc)
+
+    for row in reader:
+        name, lat, lon = row
+        name = name.replace(" ", "")
+
+        postalcodes[ name  ] = [ lat, lon ]
+    
+    #
 
     if options.outfile:
         out = open(options.outfile, "w")
@@ -67,26 +90,6 @@ if __name__ == "__main__":
 
     reader = csv.DictReader(fh)
     writer = None
-
-    postalcodes = {}
-    lookup = {}
-
-    # Please add hooks to use the API or something - we don't actually need to load 
-    # the postal codes for all of the US...
-
-    root = os.path.join(options.data_root, "whosonfirst-data-postalcode-us")
-    data = os.path.join(root, "data")
-
-    crawl = mapzen.whosonfirst.utils.crawl(data, inflate=True)
-
-    for feature in crawl:
-
-        props = feature["properties"]
-
-        name = props["wof:name"]
-        lat = props["geom:latitude"]
-        lon = props["geom:longitude"]
-        postalcodes[name] = [lat, lon]
 
     #
 
@@ -136,6 +139,7 @@ if __name__ == "__main__":
         geom = { "type": "Point", "coordinates": [ lon, lat ] }
 
         props = {
+            "name": name,
             "addr:housenumber": housenumber,
             "addr:street": street,
             "addr:full": addr_full,

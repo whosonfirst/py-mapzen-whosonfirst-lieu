@@ -1,0 +1,203 @@
+#!/usr/bin/env python
+# -*-python-*-
+
+# https://data.london.gov.uk/dataset/directory-of-london-businesses
+# http://data.companieshouse.gov.uk/doc/company/06958799
+
+# https://github.com/whosonfirst/go-xlsx2csv
+
+import os
+import sys
+import csv
+import json
+import requests
+import logging
+import time
+
+import mapzen.whosonfirst.utils
+import mapzen.whosonfirst.sources
+
+if __name__ == "__main__":
+
+    import optparse
+    opt_parser = optparse.OptionParser()
+
+    opt_parser.add_option('-P', '--postcodes', dest='postcodes', action='store', default=None, help='... (Default is None')
+    opt_parser.add_option('-O', '--outfile', dest='outfile', action='store', default=None, help="... (Default is STDOUT)")
+
+    opt_parser.add_option('-s', '--strict', dest='strict', action='store_true', default=False, help='... (Default is False)')
+    opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
+    opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is False)')
+
+    options, args = opt_parser.parse_args()
+
+    if options.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+
+    source_prefix = "ldngov_dlb"
+    source_key = "id"
+
+    #
+
+    has_pypostal = False
+
+    try:
+        from postal.parser import parse_address
+        has_pypostal = True
+
+        logging.info("libpostal is installed, using local bindings for address parsing")
+
+    except Exception, e:
+
+        if not options.api_key:
+            logging.error("libpostal is not installed, so a valid Mapzen API key is required")
+            sys.exit(1)
+
+    # as in: lieu-fetch-postalcodes -A mapzen-**** 101750367 > /usr/local/data-ext/ldngov/ldn-postcodes.csv
+
+    if not options.postcodes:
+        logging.error("Missing postcodes")
+        sys.exit(1)
+
+    if not os.path.exists(options.postcodes):
+        logging.error("Postcodes don't exist")
+        sys.exit(1)
+
+    postalcodes = {}
+    lookup = {}
+
+    pc = open(options.postcodes, "r")
+    reader = csv.reader(pc)
+
+    for row in reader:
+        name, lat, lon = row
+        name = name.replace(" ", "")
+
+        postalcodes[ name  ] = [ lat, lon ]
+
+    #
+
+    if options.outfile:
+        out = open(options.outfile, "w")
+    else:
+        out = sys.stdout
+
+    #
+
+    source_prefix = "companieshouse"
+    source_key = "number"
+
+    for path in args:
+
+        fh = open(path, "r")
+        
+        reader = csv.DictReader(fh)
+        
+        for row in reader:
+
+            name = row["CompanyName"]
+            name1 = row["PreviousName_1.CompanyName"]
+
+            id = row["CompanyNumber"]
+            postcode = row["RegAddress.PostCode"]
+
+            if not postcode:
+                logging.warning("row (%s, %s) is missing postcode so skipping" % (name, id))
+                continue
+
+            pcode = postcode.replace(" ", "")
+            coords = postalcodes.get(pcode, None)
+
+            if not coords:
+                logging.warning("can't find coords for %s (%s) and failed, skipping %s" % (postcode, pcode, id))
+                continue
+
+            lat, lon = coords
+
+            house_number = None
+            street = None
+
+            addr_full = " ".join([
+                row["RegAddress.AddressLine1"],
+                row["RegAddress.AddressLine2"],
+                row["RegAddress.PostTown"],
+                row["RegAddress.PostCode"]
+            ])
+
+
+            try:
+
+                if has_pypostal:
+
+                    rsp = parse_address(addr_full)
+                    lookup = {}
+                    
+                    for pair in rsp:
+                        v, k = pair
+
+                        possible = lookup.get(k, [])
+                        possible.append(v)                        
+                        lookup[k] = possible
+                        
+                    house_number = lookup.get("house_number", None)
+                    street = lookup.get("road", None)
+
+                    if house_number:
+                        house_number = house_number[0]
+
+                    if street:
+                        street = street[0]
+                
+                else:
+                
+                    url = "https://libpostal.mapzen.com/parse"
+                    params = { "address" : addr_full, "format": "keys", "api_key": api_key }
+                    
+                    rsp = requests.get(url, params=params)
+                    rsp = json.loads(rsp.content)
+                    
+                    house_number = rsp["house_number"][0]
+                    street = rsp["road"][0]
+                    
+            except Exception, e:
+
+                    logging.error("failed to parse address (%s) because %s" % (address, e))
+
+                    if options.strict:
+                        sys.exit(1)
+
+                    continue
+
+            source_id = "%s:%s=%s" % (source_prefix, source_key, id)
+
+            # companieshouse:number=7348189 ATMA DANCE ( ) CHELEPIS WATSON CHARTERED ACCOUNTANTS 67 WESTOW STREET LONDON SE19 3RW
+            # print "%s %s (%s) %s" % (source_id, name, name1, addr_full)
+
+            geom = {
+                "type": "Point",
+                "coordinates": [ lon, lat ]
+            }
+
+            props = {
+                "addr:street": street,
+                "addr:housenumber": house_number,
+                "addr:full": addr_full,
+                "name": name,
+                "mz:is_approximate": 1
+            }
+            
+            feature = {
+                "type": "Feature",
+                "id": source_id,
+                "geometry": geom,
+                "properties": props
+            }
+
+            out.write(json.dumps(feature))
+            out.write("\n")
+
+
+                                     
