@@ -53,7 +53,7 @@ def add_concordance(f, src, id, **kwargs):
 
     logging.info("export %s" % exporter.export_feature(f))
     
-def supersede_features(principal, others, **kwargs):
+def supersede_features(principal, to_supersede, **kwargs):
 
     data_root = kwargs.get("data_root", "/usr/local/data")
 
@@ -67,9 +67,9 @@ def supersede_features(principal, others, **kwargs):
     p_data = os.path.join(p_root, "data")
 
     principal = mapzen.whosonfirst.utils.load(p_data, p_wofid)
-    tmp = []
+    others = []
     
-    for o in others:
+    for o in to_supersede:
 
         o_props = o["properties"]
         o_wofid = o_props["wof:id"]
@@ -79,9 +79,7 @@ def supersede_features(principal, others, **kwargs):
         data = os.path.join(root, "data")
 
         o = mapzen.whosonfirst.utils.load(data, o_wofid)
-        tmp.append(o)
-
-    others = tmp
+        others.append(o)
 
     # first update the things being superseded
 
@@ -287,6 +285,7 @@ if __name__ == "__main__":
 
         else:
 
+            concordance_key = "%s:%s" % (source_prefix, source_key)
             concordance_id = id
 
             for other in same_as:
@@ -310,8 +309,6 @@ if __name__ == "__main__":
                         continue
 
                     other_to_wof[ wofid ] = concordance_id
-
-                    concordance_key = "%s:%s" % (other_source_prefix, other_source_key)
 
                     kwargs = {
                         "data_root": options.data_root,
