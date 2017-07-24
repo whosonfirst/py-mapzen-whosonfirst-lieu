@@ -58,7 +58,10 @@ if __name__ == "__main__":
             coords = [ lon, lat ]
             geom = { "type": "Point", "coordinates": coords }
 
-            source_id = "oa#%s" % id
+            source_prefix = "oa"
+            source_key = "id"
+
+            source_id = "%s:%s=%s" % (source_prefix, source_key, id)
 
             props = {
                 "name": name,

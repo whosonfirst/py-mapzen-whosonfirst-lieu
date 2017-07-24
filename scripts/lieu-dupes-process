@@ -186,7 +186,7 @@ if __name__ == "__main__":
         if dupe == False:
             continue
 
-        src, id, err = mapzen.whosonfirst.lieu.parse_feature_id(feature)
+        source_prefix, source_key, id, err = mapzen.whosonfirst.lieu.parse_feature_id(feature)
 
         if err != None:
             logging.error(err)
@@ -194,8 +194,8 @@ if __name__ == "__main__":
 
         if options.strict:
 
-            if not mapzen.whosonfirst.sources.is_valid_source(src):
-                logging.error("%s is an invalid or unknown source" % src)
+            if not mapzen.whosonfirst.sources.is_valid_source(source_prefix):
+                logging.error("%s is an invalid or unknown source" % source_prefix)
                 sys.exit(1)
 
         if src == "wof":
@@ -208,7 +208,7 @@ if __name__ == "__main__":
 
             for other_feature in same_as:
 
-                other_src, ignore, err = mapzen.whosonfirst.lieu.parse_feature_id(feature)                
+                other_source_prefix, other_source_key, ignore, err = mapzen.whosonfirst.lieu.parse_feature_id(other_feature)
             
                 if err != None:
                     logging.error(err)
@@ -218,7 +218,7 @@ if __name__ == "__main__":
                     skipped_supersedes += 1
                     continue
 
-                if other_src == "wof":
+                if other_source_prefix == "wof":
                     other_wof.append(other_feature)
 
             # first sort things according to lieu's ranking
@@ -284,13 +284,14 @@ if __name__ == "__main__":
             for other in same_as:
 
                 other_feature = other["object"]
-                other_src, other_id, err = mapzen.whosonfirst.lieu.parse_feature_id(other_feature)
+
+                other_source_prefix, other_source_key, other_id, err = mapzen.whosonfirst.lieu.parse_feature_id(other_feature)
             
                 if err != None:
                     logging.error(err)
                     continue
 
-                if other_src == "wof":
+                if other_source_prefix == "wof":
 
                     wofid = other_feature["properties"]["wof:id"]
 
@@ -302,7 +303,7 @@ if __name__ == "__main__":
 
                     other_to_wof[ wofid ] = concordance_id
 
-                    concordance_key = "%s:id" % src
+                    concordance_key = "%s:%s" % (other_source_preifx, other_source_key)
 
                     kwargs = {
                         "data_root": options.data_root,

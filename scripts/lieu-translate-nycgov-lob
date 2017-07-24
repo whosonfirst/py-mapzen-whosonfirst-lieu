@@ -10,6 +10,8 @@ import json
 import requests
 import logging
 
+import mapzen.whosonfirst.sources
+
 if __name__ == "__main__":
 
     import optparse
@@ -56,7 +58,8 @@ if __name__ == "__main__":
 
     #
 
-    source = "nycgov"
+    source_prefix = "nycgov_dca"
+    source_key = "license"
 
     for path in args:
 
@@ -157,7 +160,7 @@ if __name__ == "__main__":
             coords = [ lon, lat ]
             geom = { "type": "Point", "coordinates": coords }
 
-            source_id = "%s#%s" % (source, id)
+            source_id = "%s:%s=%s" % (source_prefix, source_key, id)
 
             props = {
                 "name": name,
@@ -174,7 +177,7 @@ if __name__ == "__main__":
                 k = k.lower()
                 k = k.replace(" ", "_")
                 
-                fq_k = "%s:%s" % (source, k)
+                fq_k = "%s:%s" % (source_prefix, k)
 
                 props[ fq_k ] = v
 

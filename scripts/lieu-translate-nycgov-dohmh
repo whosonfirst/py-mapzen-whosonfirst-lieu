@@ -8,6 +8,7 @@ import logging
 import json
 
 import mapzen.whosonfirst.utils
+import mapzen.whosonfirst.sources
 
 if __name__ == "__main__":
 
@@ -58,6 +59,9 @@ if __name__ == "__main__":
     else:
         out = sys.stdout
 
+    source_prefix = "nycgov_dohmh"
+    source_key = "camis"
+
     orig = args[0]
     fh = open(orig, "r")
 
@@ -105,12 +109,6 @@ if __name__ == "__main__":
         row["LATITUDE"] = lat
         row["LONGITUDE"] = lon
 
-        """
-        if not writer:
-            writer = csv.DictWriter(sys.stdout, fieldnames=row.keys())
-            writer.writeheader()
-        """
-
         keys = "CAMIS,DBA,BORO,BUILDING,STREET,ZIPCODE,PHONE,CUISINE DESCRIPTION,LATITUDE,LONGITUDE"
         keys = keys.split(",")
 
@@ -118,10 +116,6 @@ if __name__ == "__main__":
 
             if not k in keys:
                 del(row[k])
-
-        """
-        writer.writerow(row)
-        """
 
         id = row["CAMIS"]
         name = row["DBA"]
@@ -137,8 +131,7 @@ if __name__ == "__main__":
 
         addr_full = " ".join((housenumber, street, city, region, postal))
 
-        source = "nyc_doh"
-        source_id = "%s:%s" % (source, id)
+        source_id = "%s:%s=%s" % (source_prefix, source_key, id)
 
         geom = { "type": "Point", "coordinates": [ lon, lat ] }
 
@@ -152,7 +145,7 @@ if __name__ == "__main__":
         for k, v in row.items():
 
             k = k.lower()
-            fq_k = "%s:%s" % (source, k)
+            fq_k = "%s:%s" % (source_prefix, k)
             props[fq_k] = v
 
         feature = {

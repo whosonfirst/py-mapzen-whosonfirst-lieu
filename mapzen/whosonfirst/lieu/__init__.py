@@ -1,4 +1,5 @@
 import json
+import machinetag.common
 
 def parse_feature_id(f):
 
@@ -7,11 +8,12 @@ def parse_feature_id(f):
     if not fid:
         return None, None, Exception("Missing id property")
 
-    try:
-        source, id = fid.split("#")
-        return source, id, None
-    except Exception, e:
-        return None, None, e
+    mt = machinetag.common.from_string(fid)
+
+    if not mt.is_machinetag():
+        return None, None, None, Exception("Invalid source ID")
+
+    return mt.namespace(), mt.predicate(), mt.value(), None
 
 def to_string(f):
 
