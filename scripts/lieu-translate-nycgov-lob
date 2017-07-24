@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# lieu-translate-nycgov-loc -P nyc-postcodes.csv Legally_Operating_Businesses.csv > nycgov-venues.geojson.txt
+
 # https://data.cityofnewyork.us/Business/Legally-Operating-Businesses/w7w3-xahh/data
 # /usr/local/bin/lieu-translate-nycgov Legally_Operating_Businesses.csv > nyc-lob.geojson.txt
 
@@ -17,6 +19,7 @@ if __name__ == "__main__":
     import optparse
     opt_parser = optparse.OptionParser()
 
+    opt_parser.add_option('-P', '--postcodes', dest='postcodes', action='store', default=None, help='... (Default is None')
     opt_parser.add_option('-A', '--api-key', dest='api_key', action='store', default=None, help='... (Default is None)')
 
     opt_parser.add_option('-F', '--filter', dest='filter', action='store', default="geo", help="... (Default is 'geo')")
@@ -56,6 +59,24 @@ if __name__ == "__main__":
     else:
         out = sys.stdout
 
+    postalcodes = {}
+
+    # sudo put me in a function...
+
+    if options.postcodes:
+
+        pc = open(options.postcodes, "r")
+        reader = csv.reader(pc)
+        
+        for row in reader:
+            name, lat, lon = row
+            name = name.replace(" ", "")
+            
+            lat = float(lat)
+            lon = float(lon)
+            
+            postalcodes[ name  ] = [ lat, lon ]
+
     #
 
     source_prefix = "nycgov_dca"
@@ -78,11 +99,12 @@ if __name__ == "__main__":
 
             housenumber = row["Address Building"]
             street = row["Address Street Name"]
+            street2 = row["Secondary Address Street Name"]
             city = row["Address City"]
             region = row["Address State"]
-            postal = row["Address ZIP"]
-            postal = row["Address ZIP"]
+            zipcode = row["Address ZIP"]
 
+            is_approx = False
             lat = None
             lon = None
             
@@ -91,26 +113,27 @@ if __name__ == "__main__":
 
             if row["Longitude"]:
                 lon = float(row["Longitude"])
+            
+            if lat == None or lon == None:
+
+                if options.postcodes:
                     
-            # https://github.com/openvenues/lieu#input-formats
+                    coords = postalcodes.get(zipcode, None)
 
-            if options.filter == "geo":
+                    if coords:
+                        lat, lon = coords
+                        is_approx = True
 
-                if lat == None or lon == None:
-                    continue
-
-            if options.filter == "no-geo":
-
-                if lat != None and lon != None:
-                    continue
+            if lat == None or lon == None:
+                logging.warning("can't sort out coordinates for %s (in %s), skipping" % (id, zipcode))
+                continue
 
             #
 
-            addr_full = " ".join((housenumber, street, city, region, postal))
+            addr_full = " ".join((housenumber, street, street2, city, region, zipcode))
 
-            house_number = None
-            street = None
-            postal = None
+            house_number = ""
+            street = ""
 
             try:
 
@@ -170,6 +193,9 @@ if __name__ == "__main__":
                 "addr:full": addr_full,
             }
             
+            if is_approx:
+                props["mz:is_approximate"] = 1
+
             #
 
             for k, v in row.items():

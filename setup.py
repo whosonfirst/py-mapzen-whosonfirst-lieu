@@ -36,6 +36,7 @@ setup(
         'scripts/lieu-translate-openaddresses',
         'scripts/lieu-translate-sfgov-rbl',
         'scripts/lieu-translate-socrata',
+        'scripts/lieu-validate',
         ],
     download_url='https://github.com/whosonfirst/py-mapzen-whosonfirst-lieu/releases/tag/' + version,
     license='BSD')

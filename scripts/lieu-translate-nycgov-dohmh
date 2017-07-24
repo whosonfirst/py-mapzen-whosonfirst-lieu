@@ -66,12 +66,17 @@ if __name__ == "__main__":
     postalcodes = {}
     lookup = {}
 
+    # sudo put me in a function...
+
     pc = open(options.postcodes, "r")
     reader = csv.reader(pc)
 
     for row in reader:
         name, lat, lon = row
         name = name.replace(" ", "")
+        
+        lat = float(lat)
+        lon = float(lon)
 
         postalcodes[ name  ] = [ lat, lon ]
     

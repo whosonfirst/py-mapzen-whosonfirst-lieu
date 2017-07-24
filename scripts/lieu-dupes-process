@@ -184,7 +184,7 @@ if __name__ == "__main__":
         if err != None:
             logging.error(err)
             logging.debug(feature)
-            continue
+            sys.exit()
 
         if options.strict:
 
@@ -211,14 +211,15 @@ if __name__ == "__main__":
             principal_wof = None
             superseded_wof = []
 
-            for other_feature in same_as:
+            for sa in same_as:
 
+                other_feature = sa["object"]
                 other_source_prefix, other_source_key, ignore, err = mapzen.whosonfirst.lieu.parse_feature_id(other_feature)
             
                 if err != None:
                     logging.error(err)
                     logging.debug(other_feature)
-                    continue
+                    sys.exit(1)
 
                 if not other_feature.get("is_canonical", False): 
                     skipped_supersedes += 1
@@ -280,8 +281,9 @@ if __name__ == "__main__":
                 "deprecate_superseded": True	# CLI switch?
             }
 
-            supersede_features(principal_wof, superseded_wof, **kwargs)
-            supersedes += 1
+            if len(superseded_wof):
+                supersede_features(principal_wof, superseded_wof, **kwargs)
+                supersedes += 1
 
         else:
 
