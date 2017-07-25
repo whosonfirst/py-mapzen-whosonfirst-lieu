@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# https://data.lacity.org/A-Prosperous-City/Listing-of-Active-Businesses/6rrh-rzua
+
 import os
 import sys
 import csv
@@ -13,11 +15,10 @@ if __name__ == "__main__":
     import optparse
     opt_parser = optparse.OptionParser()
 
+    opt_parser.add_option('-P', '--postcodes', dest='postcodes', action='store', default=None, help='... (Default is None')
     opt_parser.add_option('-A', '--api-key', dest='api_key', action='store', default=None, help='... (Default is None)')
 
-    opt_parser.add_option('-F', '--filter', dest='filter', action='store', default="geo", help="... (Default is 'geo')")
     opt_parser.add_option('-O', '--outfile', dest='outfile', action='store', default=None, help="... (Default is STDOUT)")
-    opt_parser.add_option('-S', '--source', dest='source', action='store', default=None, help="... (Default is None)")
 
     opt_parser.add_option('-s', '--strict', dest='strict', action='store_true', default=False, help='... (Default is False)')
     opt_parser.add_option('-d', '--debug', dest='debug', action='store_true', default=False, help='... (Default is False)')
@@ -48,9 +49,28 @@ if __name__ == "__main__":
 
     #
 
-    if options.source == None:
-        logging.error("You must pass in a --source (-S) parameter, for prefixing IDs with")
-        sys.exit(1)
+    # sudo put me in a function...
+
+    postalcodes = {}
+
+    if options.postcodes:
+
+        pc = open(options.postcodes, "r")
+        reader = csv.reader(pc)
+        
+        for row in reader:
+            name, lat, lon = row
+            name = name.replace(" ", "")
+            
+            lat = float(lat)
+            lon = float(lon)
+            
+            postalcodes[ name  ] = [ lat, lon ]
+
+    #
+
+    source_prefix = "lacity_oof"
+    source_key = "id"
 
     #
 
@@ -76,14 +96,10 @@ if __name__ == "__main__":
 
             addr = row["STREET ADDRESS"]
             city = row["CITY"]
-            postal = row["ZIP CODE"]
+            zipcode = row["ZIP CODE"]
             loc = row["LOCATION"]
-            
-            #
-
-            if loc == "":
-                continue
-                
+                            
+            is_approx = False
             lat = None
             lon = None
             
@@ -93,28 +109,32 @@ if __name__ == "__main__":
 
                 if m:
                     gr = m.groups()
-                    lat = gr[0]
-                    lon = gr[1]
+                    lat = float(gr[0])
+                    lon = float(gr[1])
+
+            if lat == None or lon == None:
+
+                if options.postcodes:
                     
-            # https://github.com/openvenues/lieu#input-formats
+                    zipcode = zipcode.split("-")
+                    zipcode = zipcode[0]
 
-            if options.filter == "geo":
+                    coords = postalcodes.get(zipcode, None)
 
-                if lat == None or lon == None:
-                    continue
+                    if coords:
+                        lat, lon = coords
+                        is_approx = True
 
-            if options.filter == "no-geo":
-
-                if lat != None and lon != None:
-                    continue
+            if lat == None or lon == None:
+                logging.warning("can't sort out coordinates for %s (in %s), skipping" % (id, zipcode))
+                continue
 
             #
 
-            address = " ".join((addr, city, postal))
+            address = " ".join((addr, city, zipcode))
 
             house_number = None
             street = None
-            postal = None
 
             try:
 
@@ -167,7 +187,7 @@ if __name__ == "__main__":
             coords = [ lon, lat ]
             geom = { "type": "Point", "coordinates": coords }
 
-            source_id = "%s#%s" % (options.source, id)
+            source_id = "%s:%s=%s" % (source_prefix, source_key, id)
 
             props = {
                 "name": name,
@@ -175,7 +195,10 @@ if __name__ == "__main__":
                 "addr:street": street,
                 "addr:full": address,
             }
-            
+
+            if is_approx:
+                props["mz:is_approximate"] = 1
+
             feature = {
                 "type": "Feature",
                 "geometry": geom,
