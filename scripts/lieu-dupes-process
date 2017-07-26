@@ -34,8 +34,13 @@ def add_concordance(f, src, id, **kwargs):
     concordances = props.get("wof:concordances", {})
 
     if concordances.get(src):
-        logging.warning("%s already has a concordance with %s (%s)" % (wofid, src, concordances[src]))
-        return
+
+        if concordances[src] == id:
+            logging.debug("%s already has this concordance (%s (%s)), skipping" % (wofid, src, concordances[src]))
+            return False
+
+        logging.warning("%s already has a concordance with %s (%s) - what is %s (%s)" % (wofid, src, concordances[src], src, id))
+        return False
 
     concordances[src] = id
     props["wof:concordances"] = concordances
@@ -49,9 +54,10 @@ def add_concordance(f, src, id, **kwargs):
 
     if options.debug:
         logging.info("debugging is enabled otherwise we would export %s here" % wofid)
-        return
+        return True
 
     logging.info("export %s" % exporter.export_feature(f))
+    return True
     
 def supersede_features(principal, to_supersede, **kwargs):
 
@@ -196,8 +202,10 @@ if __name__ == "__main__":
 
         if dupe == False:
 
+            """
             if source_prefix != "wof": 
                 logging.debug("SKIPPING because no dupes\n%s" % ts(feature))
+            """
 
             continue
         
@@ -226,7 +234,7 @@ if __name__ == "__main__":
                     continue
 
                 if other_source_prefix == "wof":
-                    other_wof.append(other_feature)
+                    other_wof.append(sa)
 
             # first sort things according to lieu's ranking
             # still waiting on confirmation from al b. about this
@@ -305,7 +313,7 @@ if __name__ == "__main__":
                     wofid = other_feature["properties"]["wof:id"]
 
                     if wofid in all_superseded:
-                        logging.warning("%s has been superseded so skipping concordance (with %s#%s)" % (wofid, src, concordance_id))
+                        logging.warning("%s has been superseded so skipping concordance (with %s#%s)" % (wofid, concordance_key, concordance_id))
 
                         skipped_concordances += 1
                         continue
@@ -318,10 +326,10 @@ if __name__ == "__main__":
                         "is_current": 1
                     }
 
-                    add_concordance(other_feature, concordance_key, concordance_id, **kwargs)
-
                     logging.debug("CONCORDANCE:\n%s is the same as\n%s" % (ts(other_feature), ts(feature)))
-                    concordances += 1
+
+                    if add_concordance(other_feature, concordance_key, concordance_id, **kwargs):
+                        concordances += 1
 
                 else:
 
