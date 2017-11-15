@@ -89,6 +89,7 @@ if __name__ == "__main__":
 
                         principal_props = principal["properties"]
                         principal_id = principal_props["wof:id"]
+                        principal_repo = principal_props["wof:repo"]
 
                         principal_current = principal_props.get("mz:is_current", -1)
                         principal_lastmod = principal_props.get("wof:lastmodified", 0)
@@ -137,17 +138,17 @@ if __name__ == "__main__":
                                     root = os.path.join(root, principal_repo)
                                     data = os.path.join(root, "data")
 
-                                    feature = mapzen.whosonfirst.utils.load(data, principal_id)
-                                    props = feature["properties"]
+                                    principal_feature = mapzen.whosonfirst.utils.load(data, principal_id)
+                                    principal_props = principal_feature["properties"]
                                     
                                     concordances = props.get("wof:concordances", {})
                                     concordances[ osm_key ] = osm_id
 
-                                    props["wof:concordances"] = concordances
-                                    feature["properties"] = props
+                                    principal_props["wof:concordances"] = concordances
+                                    principal_feature["properties"] = principal_props
 
                                     exporter = mapzen.whosonfirst.export.flatfile(data)
-                                    exporter.export_feature(feature)
+                                    exporter.export_feature(principal_feature)
 
                                     if not principal_repo in updated:
                                                 updated.append(principal_repo)
@@ -188,12 +189,12 @@ if __name__ == "__main__":
                                                 other_props["edtf:deprecated"] = ymd
                                                 other_props["mz:is_current"] = 0
 
-                                                superseded_by = other_props.get("wof:superseded_by", [])
+                                                other_superseded_by = other_props.get("wof:superseded_by", [])
                                     
                                                 if not principal_id in superseded_by:
-                                                            superseded_by.append(principal_id)
+                                                            other_superseded_by.append(principal_id)
 
-                                                other_props["wof:superseded_by"] = superseded_by
+                                                other_props["wof:superseded_by"] = other_superseded_by
                                                 other_feature["properties"] = other_props
 
                                                 exporter = mapzen.whosonfirst.export.flatfile(data)
@@ -203,8 +204,6 @@ if __name__ == "__main__":
                                                             updated.append(other_repo)
 
                                                 superseded_count += 1
-
-                                    principal_repo = principal_props["wof:repo"]
 
                                     root = "/usr/local/data"
                                     root = os.path.join(root, principal_repo)
@@ -218,13 +217,13 @@ if __name__ == "__main__":
                                                 
                                     principal_props = other_feature["properties"]
 
-                                    supersedes = principal_props.get("wof:supersedes", [])
+                                    principal_supersedes = principal_props.get("wof:supersedes", [])
 
                                     for id in other_ids:
-                                                if not id in supersedes:
-                                                            supersedes.append(id)
+                                                if not id in principal_supersedes:
+                                                            principal_supersedes.append(id)
                                                             
-                                    principal_props["wof:superseded"] = supersedes
+                                    principal_props["wof:supersedes"] = principal_supersedes
                                     principal_feature["properties"] = principal_props
 
                                     exporter = mapzen.whosonfirst.export.flatfile(data)
