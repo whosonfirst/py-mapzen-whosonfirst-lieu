@@ -10,4 +10,6 @@ def crawl(paths):
             
             ln = ln.strip()
             data = json.loads(ln)
-            yield idx.prepare_report_bulk(data)
+            yield data
+
+            # yield idx.prepare_report_bulk(data)

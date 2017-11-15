@@ -1,0 +1,113 @@
+#!/usr/bin/env python
+
+import sys
+import os
+import pprint
+import copy
+
+import mapzen.whosonfirst.utils
+import mapzen.whosonfirst.export
+import mapzen.whosonfirst.lieu.utils
+
+if __name__ == "__main__":
+            
+            paths = sys.argv[1:]	
+            crawl = mapzen.whosonfirst.lieu.utils.crawl(paths)
+
+            for row in crawl:
+
+                        if not row["is_dupe"]:
+                                    continue
+
+                        same_as = []
+
+                        for other in row.get("same_as", []):
+
+                                    if other["classification"] == "exact_dupe":
+                                                same_as.append(other["object"])
+
+                        if len(same_as) == 0:
+                                    continue
+
+                        principal = row["object"]                
+
+                        # first just figure out if we have any WOF documents
+
+                        has_wof = False
+
+                        if principal["properties"].has_key("wof:id"):
+                                    has_wof = True
+
+                        for other in same_as:
+                                    if other["properties"].has_key("wof:id"):
+                                                has_wof = True
+                                    
+                        if not has_wof:
+                                    continue
+
+                        # now ensure that the principal record is a WOF record
+
+                        if not principal["properties"].has_key("wof:id"):
+                                    
+                                    count = len(same_as)
+                                    idx = 0
+
+                                    for other in same_as:
+
+                                                if other["properties"].has_key("wof:id"):
+
+                                                            o = copy.deepcopy(other)
+                                                            same_as[idx] = principal
+                                                            principal = o
+                                                            break
+
+                                                idx += 1
+
+                        # now sort things in to buckets
+
+                        other_wof = []
+                        other_osm = []
+
+                        for other in same_as:
+
+                                    if other["properties"].has_key("wof:id"):
+                                                other_wof.append(other)
+                                    else:
+                                                other_osm.append(other)
+
+                        # no other wof record - just concordances
+
+                        if len(other_osm) == 1 and len(other_wof) == 0:
+
+                                    principal_props = principal["properties"]
+                                    principal_id = principal_props.get("wof:id", None)
+                                    principal_repo = principal_props.get("wof:repo", None)
+
+                                    if principal_id == None or principal_repo == None:
+                                                continue
+
+                                    osm_props = other_osm[0]["properties"]
+                                    osm_id = osm_props["id"]
+                                    osm_type = osm_props["type"]
+
+                                    osm_key = "osm:%s" % osm_type
+
+                                    root = "/usr/local/data"
+                                    root = os.path.join(root, principal_repo)
+                                    data = os.path.join(root, "data")
+
+                                    feature = mapzen.whosonfirst.utils.load(data, principal_id)
+                                    props = feature["properties"]
+                                    
+                                    concordances = props.get("wof:concordances")
+                                    concordances[ osm_key ] = osm_id
+
+                                    props["wof:concordances"] = concordances
+                                    feature["properties"] = props
+
+                                    # exporter = mapzen.whosonfirst.export.flatfile(data)
+                                    # exporter.export_feature(feature)
+
+                                    print "%s %s=%s" % (principal_id, osm_key, osm_id)
+                                    
+                        # print "%s other wof: %s other osm: %s" % (principal["properties"]["wof:id"], len(other_wof), len(other_osm))
