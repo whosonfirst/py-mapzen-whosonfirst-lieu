@@ -4,6 +4,7 @@ import sys
 import os
 import pprint
 import copy
+import logging
 
 import mapzen.whosonfirst.utils
 import mapzen.whosonfirst.export
@@ -13,6 +14,14 @@ if __name__ == "__main__":
             
             paths = sys.argv[1:]	
             crawl = mapzen.whosonfirst.lieu.utils.crawl(paths)
+
+            osm_concordances = 0
+            osm_multiple = 0
+
+            superseded_count = 0
+            supersedes_count = 0
+
+            updated = []
 
             for row in crawl:
 
@@ -75,9 +84,41 @@ if __name__ == "__main__":
                                     else:
                                                 other_osm.append(other)
 
+                        # make sure the principal record is the principal record
+                        # THIS WHOLE SECTION NEEDS TO BE MADE MORE BETTER
+
+                        principal_props = principal["properties"]
+                        principal_id = principal_props["wof:id"]
+
+                        principal_current = principal_props.get("mz:is_current", -1)
+                        principal_lastmod = principal_props.get("wof:lastmodified", 0)
+
+                        principal_supersededby = principal_props.get("wof:superseded_by", [])
+
+                        if len(principal_supersededby):
+                                    print "ACK!"
+
+                        idx = 0
+
+                        for other in other_wof:
+
+                                    other_props = other["properties"]
+                                    other_current = other_props.get("mz:is_current", -1)
+                                    other_lastmod = other_props.get("wof:lastmodified", 0)
+
+                                    if other_current == 0:
+                                                continue
+
+                                    if other_current == 1 and principal_current != 1:
+                                                print "SQUAWK"
+                                                continue
+
+                                    if other_lastmod > principal_lastmod:
+                                                pass
+
                         # no other wof record - just concordances
 
-                        if len(other_osm) == 1 and len(other_wof) == 0:
+                        if len(other_osm) == 1:
 
                                     principal_props = principal["properties"]
                                     principal_id = principal_props.get("wof:id", None)
@@ -99,15 +140,102 @@ if __name__ == "__main__":
                                     feature = mapzen.whosonfirst.utils.load(data, principal_id)
                                     props = feature["properties"]
                                     
-                                    concordances = props.get("wof:concordances")
+                                    concordances = props.get("wof:concordances", {})
                                     concordances[ osm_key ] = osm_id
 
                                     props["wof:concordances"] = concordances
                                     feature["properties"] = props
 
-                                    # exporter = mapzen.whosonfirst.export.flatfile(data)
-                                    # exporter.export_feature(feature)
+                                    exporter = mapzen.whosonfirst.export.flatfile(data)
+                                    exporter.export_feature(feature)
 
-                                    print "%s %s=%s" % (principal_id, osm_key, osm_id)
+                                    if not principal_repo in updated:
+                                                updated.append(principal_repo)
+
+                                    # print "%s %s=%s" % (principal_id, osm_key, osm_id)
+                                    osm_concordances += 1
+
+                        if len(other_osm) > 1:
+
+                                    osm_multiple += 1
+
+                        if len(other_wof):
+
+                                    other_ids = []
+
+                                    for other in other_wof:
+                                                
+                                                other_props = other["properties"]
+                                                other_id = other_props["wof:id"]
+                                                other_repo = other_props["wof:repo"]
+
+                                                other_ids.append(other_id)
+
+                                                root = "/usr/local/data"
+                                                root = os.path.join(root, other_repo)
+                                                data = os.path.join(root, "data")
+
+                                                try:
+                                                            other_feature = mapzen.whosonfirst.utils.load(data, other_id)
+                                                except Exception, e:
+                                                            logging.error("failed to load %s (%s) because %s" % (other_id, data, e))
+                                                            continue
+
+                                                other_props = other_feature["properties"]
+
+                                                ymd = "2017-11-15"	# please fix me
+
+                                                other_props["edtf:deprecated"] = ymd
+                                                other_props["mz:is_current"] = 0
+
+                                                superseded_by = other_props.get("wof:superseded_by", [])
                                     
-                        # print "%s other wof: %s other osm: %s" % (principal["properties"]["wof:id"], len(other_wof), len(other_osm))
+                                                if not principal_id in superseded_by:
+                                                            superseded_by.append(principal_id)
+
+                                                other_props["wof:superseded_by"] = superseded_by
+                                                other_feature["properties"] = other_props
+
+                                                exporter = mapzen.whosonfirst.export.flatfile(data)
+                                                exporter.export_feature(other_feature)
+                                                
+                                                if not other_repo in updated:
+                                                            updated.append(other_repo)
+
+                                                superseded_count += 1
+
+                                    principal_repo = principal_props["wof:repo"]
+
+                                    root = "/usr/local/data"
+                                    root = os.path.join(root, principal_repo)
+                                    data = os.path.join(root, "data")
+
+                                    try:
+                                                principal_feature = mapzen.whosonfirst.utils.load(data, principal_id)
+                                    except Exception, e:
+                                                logging.error("failed to load %s (%s) because %s" % (other_id, data, e))
+                                                continue
+                                                
+                                    principal_props = other_feature["properties"]
+
+                                    supersedes = principal_props.get("wof:supersedes", [])
+
+                                    for id in other_ids:
+                                                if not id in supersedes:
+                                                            supersedes.append(id)
+                                                            
+                                    principal_props["wof:superseded"] = supersedes
+                                    principal_feature["properties"] = principal_props
+
+                                    exporter = mapzen.whosonfirst.export.flatfile(data)
+                                    exporter.export_feature(principal_feature)
+                                    
+                                    if not principal_repo in updated:
+                                                updated.append(principal_repo)
+
+                                    supersedes_count += 1
+
+            print "OSM concordances: %s multiple: %s" % (osm_concordances, osm_multiple)
+            print "WOF supersedes: %s superseded: %s" % (supersedes_count, superseded_count)
+
+            print ";".join(updated)
