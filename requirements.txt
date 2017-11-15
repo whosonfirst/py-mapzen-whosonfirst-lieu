@@ -1,5 +1,6 @@
 requests
 git+git://github.com/whosonfirst/py-machinetag
 git+git://github.com/whosonfirst/py-mapzen-whosonfirst-utils
+git+git://github.com/whosonfirst/py-mapzen-whosonfirst-elasticsearch
 git+git://github.com/whosonfirst/py-mapzen-whosonfirst-export
 git+git://github.com/whosonfirst/py-mapzen-whosonfirst-sources
