@@ -3,20 +3,30 @@
 import sys
 import mapzen.whosonfirst.lieu.utils
 import mapzen.whosonfirst.lieu.search
+import logging
 
 if __name__ == "__main__":
 
-    idx = mapzen.whosonfirst.lieu.search.index()
+    import optparse
+    opt_parser = optparse.OptionParser()
 
-    crawl = mapzen.whosonfirst.lieu.utils.crawl(sys.argv[1:])
+    opt_parser.add_option('-H', '--host', dest='host', action='store', default='localhost', help='...')
+    opt_parser.add_option('-P', '--port', dest='port', action='store', default=9200, help='...')
+
+    opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is False)')
+
+    options, args = opt_parser.parse_args()
+
+    if options.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    idx = mapzen.whosonfirst.lieu.search.index(host=options.host, port=options.port)
+
+    crawl = mapzen.whosonfirst.lieu.utils.crawl(args)
 
     for report in crawl:
 
         iter = idx.prepare_report_bulk(report)
-
-        for r in iter:
-            print r
-
-        # break
-
-        # idx.index_documents_bulk(iter)
+        idx.index_documents_bulk(iter)
