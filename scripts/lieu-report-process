@@ -12,8 +12,19 @@ import mapzen.whosonfirst.lieu.utils
 
 if __name__ == "__main__":
             
-            paths = sys.argv[1:]	
-            crawl = mapzen.whosonfirst.lieu.utils.crawl(paths)
+            import optparse
+            opt_parser = optparse.OptionParser()
+            
+            opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is False)')
+            
+            options, args = opt_parser.parse_args()
+            
+            if options.verbose:
+                        logging.basicConfig(level=logging.DEBUG)
+            else:
+                        logging.basicConfig(level=logging.INFO)
+                        
+            crawl = mapzen.whosonfirst.lieu.utils.crawl(args)
 
             osm_concordances = 0
             osm_multiple = 0
@@ -141,10 +152,12 @@ if __name__ == "__main__":
                                     principal_feature = mapzen.whosonfirst.utils.load(data, principal_id)
                                     principal_props = principal_feature["properties"]
                                     
-                                    concordances = props.get("wof:concordances", {})
-                                    concordances[ osm_key ] = osm_id
+                                    concordances = principal_props.get("wof:concordances", {})
+                                    concordances[ osm_key ] = int(osm_id)
 
                                     principal_props["wof:concordances"] = concordances
+                                    principal_props["mz:is_current"] = 1
+
                                     principal_feature["properties"] = principal_props
 
                                     exporter = mapzen.whosonfirst.export.flatfile(data)
@@ -172,14 +185,14 @@ if __name__ == "__main__":
 
                                                 other_ids.append(other_id)
 
-                                                root = "/usr/local/data"
-                                                root = os.path.join(root, other_repo)
-                                                data = os.path.join(root, "data")
+                                                other_root = "/usr/local/data"
+                                                other_root = os.path.join(other_root, other_repo)
+                                                other_data = os.path.join(other_root, "data")
 
                                                 try:
-                                                            other_feature = mapzen.whosonfirst.utils.load(data, other_id)
+                                                            other_feature = mapzen.whosonfirst.utils.load(other_data, other_id)
                                                 except Exception, e:
-                                                            logging.error("failed to load %s (%s) because %s" % (other_id, data, e))
+                                                            logging.error("failed to load %s (%s) because %s" % (other_id, other_data, e))
                                                             continue
 
                                                 other_props = other_feature["properties"]
@@ -191,7 +204,7 @@ if __name__ == "__main__":
 
                                                 other_superseded_by = other_props.get("wof:superseded_by", [])
                                     
-                                                if not principal_id in superseded_by:
+                                                if not principal_id in other_superseded_by:
                                                             other_superseded_by.append(principal_id)
 
                                                 other_props["wof:superseded_by"] = other_superseded_by
@@ -205,17 +218,17 @@ if __name__ == "__main__":
 
                                                 superseded_count += 1
 
-                                    root = "/usr/local/data"
-                                    root = os.path.join(root, principal_repo)
-                                    data = os.path.join(root, "data")
+                                    principal_root = "/usr/local/data"
+                                    principal_root = os.path.join(principal_root, principal_repo)
+                                    principal_data = os.path.join(principal_root, "data")
 
                                     try:
-                                                principal_feature = mapzen.whosonfirst.utils.load(data, principal_id)
+                                                principal_feature = mapzen.whosonfirst.utils.load(principal_data, principal_id)
                                     except Exception, e:
-                                                logging.error("failed to load %s (%s) because %s" % (other_id, data, e))
+                                                logging.error("failed to load %s (%s) because %s" % (principal_id, principal_data, e))
                                                 continue
                                                 
-                                    principal_props = other_feature["properties"]
+                                    principal_props = principal_feature["properties"]
 
                                     principal_supersedes = principal_props.get("wof:supersedes", [])
 
@@ -226,7 +239,7 @@ if __name__ == "__main__":
                                     principal_props["wof:supersedes"] = principal_supersedes
                                     principal_feature["properties"] = principal_props
 
-                                    exporter = mapzen.whosonfirst.export.flatfile(data)
+                                    exporter = mapzen.whosonfirst.export.flatfile(principal_data)
                                     exporter.export_feature(principal_feature)
                                     
                                     if not principal_repo in updated:
