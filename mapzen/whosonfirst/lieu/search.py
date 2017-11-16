@@ -76,8 +76,6 @@ class index(mapzen.whosonfirst.elasticsearch.index):
 
                 rows.append(row)
 
-        # will this work?
-
         for row in rows:
             yield row
 
