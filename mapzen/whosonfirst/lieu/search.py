@@ -2,12 +2,15 @@ import mapzen.whosonfirst.elasticsearch
 import hashlib
 import copy
 import json
+import time
 
 class index(mapzen.whosonfirst.elasticsearch.index):
 
     def __init__(self, **kwargs):
 
         mapzen.whosonfirst.elasticsearch.index.__init__(self, **kwargs)
+
+        self.counter = kwargs.get('counter', 1)
 
     def prepare_report_bulk(self, report):
 
@@ -66,7 +69,8 @@ class index(mapzen.whosonfirst.elasticsearch.index):
                 source["lieu:rel"] = rel
                 source["lieu:hash"] = hash_report
                 source["is_dupe"] = is_dupe
-            
+                source["lieu:timestamp"] = time.time()		# something so we can do basic pagination with
+
                 row = {
                     # "_id": ""			# just let ES do this
                     "_index": "lieu",
